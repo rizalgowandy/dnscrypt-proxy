@@ -1,7 +1,6 @@
 package quic
 
 import (
-	"fmt"
 	"log"
 	"net"
 	"os"
@@ -59,8 +58,8 @@ func wrapConn(pc net.PacketConn) (rawConn, error) {
 			return nil, err
 		}
 
+		// only set DF on UDP sockets
 		if _, ok := pc.LocalAddr().(*net.UDPAddr); ok {
-			// Only set DF on sockets that we expect to be able to handle that configuration.
 			var err error
 			supportsDF, err = setDF(rawConn)
 			if err != nil {
@@ -105,9 +104,12 @@ func (c *basicConn) ReadPacket() (receivedPacket, error) {
 	}, nil
 }
 
-func (c *basicConn) WritePacket(b []byte, packetSize uint16, addr net.Addr, _ []byte) (n int, err error) {
-	if uint16(len(b)) != packetSize {
-		panic(fmt.Sprintf("inconsistent length. got: %d. expected %d", packetSize, len(b)))
+func (c *basicConn) WritePacket(b []byte, addr net.Addr, _ []byte, gsoSize uint16, ecn protocol.ECN) (n int, err error) {
+	if gsoSize != 0 {
+		panic("cannot use GSO with a basicConn")
+	}
+	if ecn != protocol.ECNUnsupported {
+		panic("cannot use ECN with a basicConn")
 	}
 	return c.PacketConn.WriteTo(b, addr)
 }
